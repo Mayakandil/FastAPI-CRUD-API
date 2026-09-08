@@ -172,7 +172,25 @@ FastAPI-CRUD-API/
 ├── README.md
 └── swagger.png
 ```
+## SQLite Database
 
-## Notes
+This project uses **SQLite** to store tasks permanently instead of keeping them in an in-memory list. SQLite was chosen because it is lightweight, easy to use, and does not require a separate database server, making it suitable for a small CRUD API project.
 
-Tasks are stored **in memory**, so changes are not permanent. If the server is restarted, the task list returns to the initial data defined in `main.py`.
+The database is stored in the project directory as `tasks.db`. When the application starts, it automatically creates the database and the `tasks` table if they do not already exist.
+
+To run the project after cloning the repository:
+
+```bash
+pip install fastapi uvicorn
+uvicorn main:app --reload --port 8001
+```
+
+Then open the Swagger UI at `http://127.0.0.1:8001/docs`.
+
+The database was inspected using **DB Browser for SQLite**. One example SQL query executed during development was:
+
+```sql
+SELECT * FROM tasks WHERE done = 1;
+```
+
+This query returns all completed tasks.
