@@ -5,7 +5,7 @@ tasks = [
 ]
 
 from fastapi import FastAPI , Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse ,Response
 
 app = FastAPI()
 
@@ -54,5 +54,69 @@ async def create_tasks(request: Request):
     return JSONResponse(
         status_code=201, content = new_task
     )
+
+@app.put("/tasks/{id}")
+async def update_task(id:int , request: Request):
+    #find the task 
+    task = next ((task for task in tasks if task["id"]==id), None)
+
+    if task is None:
+        return JSONResponse(
+            status_code=404, content={"error":"task id not found"}
+        )
+
+    try:
+        body = await request.json()
+    except:
+        return JSONResponse(
+            status_code=404,content={"error":"invalid request body"}
+
+        )
+    #body myst be non empty dictionary 
+    if not isinstance(body,dict) or len(body)==0:
+        return JSONResponse(
+            status_code=404,content={"error":"invalid request body"}
+
+        )
+    #must contain either title or done 
+    if "title" not in body or "done" not in body:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Body must contain title and/or done"}
+        )
+
+    #validate title
+    if "title" in body :
+        if not isinstance(body["title"],str) or not body["title"].strip():
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid title"}
+            )
+        task["title"]=body["title"]
+
+    #validate done
+    if "done" in body :
+        if not isinstance(body["done"],bool):
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid title"}
+            )
+    task["done"]=body["done"]
+
+    return task
+
+@app.delete("tasks/{id}")
+async def delete_task(id:int):
+    task = next((task for task in tasks if task["id"]==id), None)
+    if task is None:
+        return JSONResponse(
+                status_code=404,
+                content={"error": "task not found"}
+            )
+    tasks.remove(task)
+
+    return Response(status_code=204)
+
+
 
 
