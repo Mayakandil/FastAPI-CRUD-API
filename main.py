@@ -3,13 +3,16 @@ tasks = [
     {"id": 2, "title": "Build CRUD API", "done": False},
     {"id": 3, "title": "Push project to GitHub", "done": True}
 ]
-
-from fastapi import FastAPI , Request
+from pydantic import BaseModel
+from fastapi import FastAPI , Request , Body
 from fastapi.responses import JSONResponse ,Response
 
 app = FastAPI()
+class taskCreate(BaseModel):
+    title: str
 
-@app.get("/") # "@" decorator , takes the function below and does something with it , in this case --> path "/" operation "get" decorator "@"
+
+@app.get("/" , description="Welcome message for the Task API") # "@" decorator , takes the function below and does something with it , in this case --> path "/" operation "get" decorator "@"
 async def root(): # async == in hury , momken nshelha 3ady 
     return { "name": "Task API", "version": "1.0", "endpoints": ["/tasks"] }
 
@@ -17,11 +20,11 @@ async def root(): # async == in hury , momken nshelha 3ady
 async def health():
     return { "status": "ok" }
 
-@app.get("/tasks")
+@app.get("/tasks", description="get all tasks")
 async def get_tasks():
     return tasks
 
-@app.get("/tasks/{id}")
+@app.get("/tasks/{id}", description="get a task by ID")
 async def taskid(id:int):
     for task in tasks :
         if task["id"]== id:
@@ -31,9 +34,9 @@ async def taskid(id:int):
         status_code=404, content={"error":f"task {id} not found "}
     )
 
-@app.post("/tasks")
-async def create_tasks(request: Request):
-    data = await request.json()
+@app.post("/tasks", description="create a new task")
+async def create_tasks(data: dict = Body(...)):
+
 
     #vaidate title
     if "title" not in data or not data["title"].strip():
@@ -55,8 +58,8 @@ async def create_tasks(request: Request):
         status_code=201, content = new_task
     )
 
-@app.put("/tasks/{id}")
-async def update_task(id:int , request: Request):
+@app.put("/tasks/{id}", description="update an existing task by ID")
+async def update_task(id:int , body: dict = Body(...)):
     #find the task 
     task = next ((task for task in tasks if task["id"]==id), None)
 
@@ -65,21 +68,15 @@ async def update_task(id:int , request: Request):
             status_code=404, content={"error":"task id not found"}
         )
 
-    try:
-        body = await request.json()
-    except:
-        return JSONResponse(
-            status_code=404,content={"error":"invalid request body"}
 
-        )
     #body myst be non empty dictionary 
     if not isinstance(body,dict) or len(body)==0:
         return JSONResponse(
-            status_code=404,content={"error":"invalid request body"}
+            status_code=400,content={"error":"invalid request body"}
 
         )
     #must contain either title or done 
-    if "title" not in body or "done" not in body:
+    if "title" not in body and "done" not in body:
         return JSONResponse(
             status_code=400,
             content={"error": "Body must contain title and/or done"}
@@ -101,11 +98,11 @@ async def update_task(id:int , request: Request):
                 status_code=400,
                 content={"error": "Invalid title"}
             )
-    task["done"]=body["done"]
+        task["done"]=body["done"]
 
     return task
 
-@app.delete("tasks/{id}")
+@app.delete("/tasks/{id}" , description="delete a task")
 async def delete_task(id:int):
     task = next((task for task in tasks if task["id"]==id), None)
     if task is None:
