@@ -194,3 +194,37 @@ SELECT * FROM tasks WHERE done = 1;
 ```
 
 This query returns all completed tasks.
+
+
+
+
+## PostgreSQL & Docker Integration
+
+The Task CRUD API now uses PostgreSQL as its persistent database instead of SQLite.
+
+The application and database are containerized using Docker and Docker Compose, allowing the complete project to be started with a single command.
+
+### Technologies Added
+
+- PostgreSQL 16
+- Docker
+- Docker Compose
+- Psycopg 3
+- python-dotenv
+
+### Project Architecture
+
+The application separates the API routes from database operations:
+
+FastAPI Routes → Repository → Psycopg → PostgreSQL
+
+Database operations are implemented in `repository.py`, while the API endpoints remain in `main.py`.
+
+### Environment Variables
+
+Database configuration is stored in a `.env` file and loaded using `python-dotenv`.
+
+Example:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/crud_db
