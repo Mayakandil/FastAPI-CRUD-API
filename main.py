@@ -1,47 +1,8 @@
-import sqlite3
 from fastapi import FastAPI, Body
 from fastapi.responses import JSONResponse, Response
+from repository import ( get_all_tasks , get_task_by_id , create_task , delete_task  as delete_task_from_db, update_task as update_task_from_db)
 
 app = FastAPI()
-
-
-def get_db():
-    conn = sqlite3.connect("tasks.db")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY,
-            title TEXT NOT NULL,
-            done BOOLEAN NOT NULL
-        )
-    """)
-
-    cursor.execute("SELECT COUNT(*) FROM tasks")
-    count = cursor.fetchone()[0]
-
-    if count == 0:
-        cursor.executemany(
-            "INSERT INTO tasks (title, done) VALUES (?, ?)",
-            [
-                ("Learn FastAPI", False),
-                ("Build CRUD API", False),
-                ("Push to GitHub", False)
-            ]
-        )
-
-    conn.commit()
-    conn.close()
-
-
-init_db()
-
 
 @app.get("/", description="Welcome message for the Task API")
 async def root():
@@ -56,106 +17,58 @@ async def root():
 async def health():
     return {"status": "ok"}
 
-
+# GET all tasks
 @app.get("/tasks", description="Get all tasks")
 async def get_tasks():
-    conn = get_db()
-    cursor = conn.cursor()
+    return get_all_tasks()
+    
 
-    cursor.execute("SELECT * FROM tasks")
-    rows = cursor.fetchall()
-
-    conn.close()
-
-    tasks = []
-
-    for row in rows:
-        tasks.append({
-            "id": row["id"],
-            "title": row["title"],
-            "done": bool(row["done"])
-        })
-
-    return tasks
-
-
+#GET task by id 
 @app.get("/tasks/{id}", description="Get a task by ID")
 async def taskid(id: int):
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
-        (id,)
-    )
-
-    row = cursor.fetchone()
-
-    conn.close()
-
-    if row is None:
+    task = get_task_by_id(id)
+    if task is None:
         return JSONResponse(
-            status_code=404,
-            content={"error": f"task {id} not found"}
+            status_code=404, content={"error":f"task {id} not found"}
         )
+    return task
+  
 
-    return {
-        "id": row["id"],
-        "title": row["title"],
-        "done": bool(row["done"])
-    }
-
-
+# CREATE taks 
 @app.post("/tasks", description="Create a new task")
-async def create_tasks(data: dict = Body(...)):
+async def create_tasks(data: dict = Body(...)): # el data el hategy men request body fel url w (...) m3naha enha required 
 
     # validate title
     if (
-        "title" not in data
-        or not isinstance(data["title"], str)
+        "title" not in data # body mafhosh klmet data aslan returns true or false
+        or not isinstance(data["title"], str) #title is not string 
         or not data["title"].strip()
     ):
         return JSONResponse(
-            status_code=400,
+            status_code=400, # bad request , el user b3at data ghalat 
             content={"error": "title is required"}
         )
 
     title = data["title"].strip()
     done = data.get("done", False)
+    #get done 3alshan done de optional aslon momken matb2ash mawgoda fa in this case hanakhod el default which is False --> dictionary.get(key, default_value) 
 
     # validate done if provided
-    if not isinstance(done, bool):
+    if not isinstance(done, bool): # law done msh true or false -->
         return JSONResponse(
             status_code=400,
             content={"error": "done must be boolean"}
         )
 
-    conn = get_db()
-    cursor = conn.cursor()
+    new_task= create_task(title , done)
 
-    cursor.execute(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)",
-        (title, done)
-    )
-
-    conn.commit()
-
-    task_id = cursor.lastrowid
-
-    conn.close()
-
-    new_task = {
-        "id": task_id,
-        "title": title,
-        "done": done
-    }
 
     return JSONResponse(
         status_code=201,
         content=new_task
     )
 
-
+#UPDATE task 
 @app.put("/tasks/{id}", description="Update an existing task by ID")
 async def update_task(id: int, body: dict = Body(...)):
 
@@ -172,25 +85,16 @@ async def update_task(id: int, body: dict = Body(...)):
             content={"error": "Body must contain title and/or done"}
         )
 
-    conn = get_db()
-    cursor = conn.cursor()
+    existing_task = get_task_by_id(id)
 
-    cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
-        (id,)
-    )
-
-    row = cursor.fetchone()
-
-    if row is None:
-        conn.close()
+    if existing_task is None:
         return JSONResponse(
             status_code=404,
             content={"error": "task id not found"}
         )
 
-    title = row["title"]
-    done = bool(row["done"])
+    title = existing_task["title"]
+    done = existing_task["done"]
 
     # validate title
     if "title" in body:
@@ -198,7 +102,7 @@ async def update_task(id: int, body: dict = Body(...)):
             not isinstance(body["title"], str)
             or not body["title"].strip()
         ):
-            conn.close()
+           
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid title"}
@@ -209,59 +113,31 @@ async def update_task(id: int, body: dict = Body(...)):
     # validate done
     if "done" in body:
         if not isinstance(body["done"], bool):
-            conn.close()
+            
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid done value"}
             )
 
         done = body["done"]
+    uptask = update_task_from_db(id,title, done)
 
-    cursor.execute(
-        """
-        UPDATE tasks
-        SET title = ?, done = ?
-        WHERE id = ?
-        """,
-        (title, done, id)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return {
-        "id": id,
-        "title": title,
-        "done": done
-    }
+    return uptask
 
 
+#DELETE task
 @app.delete("/tasks/{id}", description="Delete a task")
 async def delete_task(id: int):
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
-        (id,)
-    )
-
-    row = cursor.fetchone()
-
-    if row is None:
-        conn.close()
-
+    existing_task = get_task_by_id(id)
+    if existing_task is None:
         return JSONResponse(
-            status_code=404,
-            content={"error": "task not found"}
-        )
-
-    cursor.execute(
-        "DELETE FROM tasks WHERE id = ?",
-        (id,)
-    )
-
-    conn.commit()
-    conn.close()
-
+                    status_code=404,
+                    content={"error": "task not found"}
+                )
+    delete_task_from_db(id)
     return Response(status_code=204)
+
+
+
+
+
